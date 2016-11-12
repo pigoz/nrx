@@ -72,7 +72,6 @@ static void glupdate(void* ctx);
 
 @interface CocoaWindow : NSWindow
 @property (retain, readonly) MpvClientOGLView* glView;
-@property (retain, readonly) NSButton* pauseButton;
 @end
 
 @implementation CocoaWindow
@@ -81,20 +80,8 @@ static void glupdate(void* ctx);
 - (void)initOGLView
 {
     NSRect bounds = [[self contentView] bounds];
-    // window coordinate origin is bottom left
-    NSRect glFrame = NSMakeRect(bounds.origin.x, bounds.origin.y + 30, bounds.size.width, bounds.size.height - 30);
-    _glView = [[MpvClientOGLView alloc] initWithFrame:glFrame];
+    _glView = [[MpvClientOGLView alloc] initWithFrame:bounds];
     [self.contentView addSubview:_glView];
-
-    NSRect buttonFrame = NSMakeRect(bounds.origin.x, bounds.origin.y, 60, 30);
-    _pauseButton = [[NSButton alloc] initWithFrame:buttonFrame];
-    _pauseButton.buttonType = NSToggleButton;
-    // button target has to be the delegate (it holds the mpv context
-    // pointer), so that's set later.
-    _pauseButton.action = @selector(togglePause:);
-    _pauseButton.title = @"Pause";
-    _pauseButton.alternateTitle = @"Play";
-    [self.contentView addSubview:_pauseButton];
 }
 @end
 
@@ -154,7 +141,6 @@ static void wakeup(void*);
     NSString* filename = args[1];
 
     [self createWindow];
-    window.pauseButton.target = self;
 
     mpv = mpv_create();
     if (!mpv) {
@@ -217,24 +203,6 @@ static void glupdate(void* ctx)
 
     default:
         printf("event: %s\n", mpv_event_name(event->event_id));
-    }
-}
-
-- (void)togglePause:(NSButton*)button
-{
-    if (mpv) {
-        switch (button.state) {
-        case NSOffState: {
-            int pause = 0;
-            mpv_set_property(mpv, "pause", MPV_FORMAT_FLAG, &pause);
-        } break;
-        case NSOnState: {
-            int pause = 1;
-            mpv_set_property(mpv, "pause", MPV_FORMAT_FLAG, &pause);
-        } break;
-        default:
-            NSLog(@"This should never happen.");
-        }
     }
 }
 
