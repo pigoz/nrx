@@ -28,7 +28,6 @@ static void glupdate(void* ctx);
 @interface MpvClientOGLView : NSOpenGLView
 @property mpv_opengl_cb_context* mpvGL;
 - (instancetype)initWithFrame:(NSRect)frame;
-- (void)drawRect;
 - (void)fillBlack;
 @end
 
@@ -61,18 +60,13 @@ static void glupdate(void* ctx);
     glClear(GL_COLOR_BUFFER_BIT);
 }
 
-- (void)drawRect
+- (void)drawRect:(NSRect)dirtyRect
 {
     if (self.mpvGL)
         mpv_opengl_cb_draw(self.mpvGL, 0, self.bounds.size.width, -self.bounds.size.height);
     else
         [self fillBlack];
     [[self openGLContext] flushBuffer];
-}
-
-- (void)drawRect:(NSRect)dirtyRect
-{
-    [self drawRect];
 }
 @end
 
@@ -202,11 +196,7 @@ static void wakeup(void*);
 static void glupdate(void* ctx)
 {
     MpvClientOGLView* glView = (__bridge MpvClientOGLView*)ctx;
-    // I'm still not sure what the best way to handle this is, but this
-    // works.
-    dispatch_async(dispatch_get_main_queue(), ^{
-        [glView drawRect];
-    });
+    [glView setNeedsDisplay: YES];
 }
 
 - (void)handleEvent:(mpv_event*)event
