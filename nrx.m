@@ -163,7 +163,14 @@ static void wakeup(void*);
     }
 
     check_error(mpv_set_option_string(mpv, "terminal", "yes"));
-    check_error(mpv_set_option_string(mpv, "msg-level", "all=v"));
+    // check_error(mpv_set_option_string(mpv, "config", "yes"));
+    // check_error(mpv_set_option_string(mpv, "msg-level", "all=v"));
+    // check_error(mpv_set_option_string(mpv, "profile", "opengl-hq"));
+    // check_error(mpv_set_option_string(mpv, "input-conf", "..."));
+    check_error(mpv_set_option_string(mpv, "video-sync", "display-resample"));
+    check_error(mpv_set_option_string(mpv, "display-fps", "60"));
+    check_error(mpv_set_option_string(mpv, "input-app-events", "yes"));
+    check_error(mpv_set_option_string(mpv, "input-ipc-server", "/tmp/mpvsocket"));
     // check_error(mpv_request_log_messages(mpv, "warn"));
 
     check_error(mpv_initialize(mpv));
