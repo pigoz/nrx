@@ -68,7 +68,12 @@ static void glupdate(void* ctx);
         glClearColor(0, 0, 0, 0);
         glClear(GL_COLOR_BUFFER_BIT);
     }
+
     [[self openGLContext] flushBuffer];
+
+    if (self.glctx) {
+        mpv_opengl_cb_report_flip(self.glctx, 0);
+    }
 }
 @end
 
