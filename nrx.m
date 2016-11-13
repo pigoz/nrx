@@ -35,22 +35,26 @@ static void glupdate(void* ctx);
 @implementation VideoView
 - (instancetype)initWithFrame:(NSRect)frame
 {
-    // make sure the pixel format is double buffered so we can use
-    // [[self openGLContext] flushBuffer].
-    NSOpenGLPixelFormatAttribute attributes[] = { NSOpenGLPFADoubleBuffer, 0 };
+    NSOpenGLPixelFormatAttribute attributes[] = {
+        NSOpenGLPFAOpenGLProfile, NSOpenGLProfileVersion4_1Core,
+        NSOpenGLPFADoubleBuffer,
+        NSOpenGLPFAAccelerated,
+        NSOpenGLPFANoRecovery,
+        0
+    };
     self = [super initWithFrame:frame
                     pixelFormat:[[NSOpenGLPixelFormat alloc]
                                     initWithAttributes:attributes]];
 
     if (self) {
         [self setAutoresizingMask:NSViewWidthSizable | NSViewHeightSizable];
-        // swap on vsyncs
         GLint swapInt = 1;
         [[self openGLContext] setValues:&swapInt
-                           forParameter:NSOpenGLCPSwapInterval];
+                       forParameter:NSOpenGLCPSwapInterval];
         [[self openGLContext] makeCurrentContext];
         self.glctx = nil;
     }
+
     return self;
 }
 
@@ -151,7 +155,8 @@ static void wakeup(void*);
     }
 
     check_error(mpv_set_option_string(mpv, "terminal", "yes"));
-    check_error(mpv_request_log_messages(mpv, "warn"));
+    check_error(mpv_set_option_string(mpv, "msg-level", "all=v"));
+    // check_error(mpv_request_log_messages(mpv, "warn"));
 
     check_error(mpv_initialize(mpv));
     check_error(mpv_set_option_string(mpv, "vo", "opengl-cb"));
