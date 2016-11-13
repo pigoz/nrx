@@ -126,6 +126,9 @@ static void wakeup(void*);
         [m addItemWithTitle:@"Apple" action:nil keyEquivalent:@""];
     NSMenu* sm = [[NSMenu alloc] initWithTitle:@"Apple"];
     [m setSubmenu:sm forItem:item];
+    [sm addItemWithTitle:@"fullscreen"
+                  action:@selector(fullscreen)
+           keyEquivalent:@"f"];
     [sm addItemWithTitle:@"quit"
                   action:@selector(terminate:)
            keyEquivalent:@"q"];
@@ -197,6 +200,24 @@ static void glupdate(void* ctx)
 {
     VideoView* videoView = (__bridge VideoView*)ctx;
     [videoView setNeedsDisplay:YES];
+}
+
+- (void)fullscreen
+{
+    if (![window.videoView isInFullScreenMode]) {
+        NSApplicationPresentationOptions popts =
+            NSApplicationPresentationDefault |
+            NSApplicationPresentationAutoHideMenuBar |
+            NSApplicationPresentationAutoHideDock;
+        NSDictionary *fsopts = @{
+            NSFullScreenModeAllScreens: @(NO),
+            NSFullScreenModeApplicationPresentationOptions: @(popts)
+        };
+        [window.videoView enterFullScreenMode:[window screen]
+                                  withOptions:fsopts];
+    } else {
+        [window.videoView exitFullScreenModeWithOptions:nil];
+    }
 }
 
 - (void)handleEvent:(mpv_event*)event
