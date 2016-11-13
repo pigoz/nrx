@@ -17,20 +17,19 @@ static inline void check_error(int status)
 
 static void* get_proc_address(void* ctx, const char* name)
 {
-    CFStringRef symbolName = CFStringCreateWithCString(
+    CFStringRef symbol = CFStringCreateWithCString(
         kCFAllocatorDefault, name, kCFStringEncodingASCII);
     void* addr = CFBundleGetFunctionPointerForName(
-        CFBundleGetBundleWithIdentifier(CFSTR("com.apple.opengl")), symbolName);
-    CFRelease(symbolName);
+        CFBundleGetBundleWithIdentifier(CFSTR("com.apple.opengl")), symbol);
+    CFRelease(symbol);
     return addr;
 }
 
 static void glupdate(void* ctx);
 
 @interface VideoView : NSOpenGLView
-@property mpv_opengl_cb_context* mpvGL;
+@property mpv_opengl_cb_context* glctx;
 - (instancetype)initWithFrame:(NSRect)frame;
-- (void)fillBlack;
 @end
 
 @implementation VideoView
@@ -50,41 +49,37 @@ static void glupdate(void* ctx);
         [[self openGLContext] setValues:&swapInt
                            forParameter:NSOpenGLCPSwapInterval];
         [[self openGLContext] makeCurrentContext];
-        self.mpvGL = nil;
+        self.glctx = nil;
     }
     return self;
 }
 
-- (void)fillBlack
-{
-    glClearColor(0, 0, 0, 0);
-    glClear(GL_COLOR_BUFFER_BIT);
-}
-
 - (void)drawRect:(NSRect)dirtyRect
 {
-    if (self.mpvGL) {
+    if (self.glctx) {
         mpv_opengl_cb_draw(
-            self.mpvGL, 0, self.bounds.size.width, -self.bounds.size.height);
+            self.glctx, 0, self.bounds.size.width, -self.bounds.size.height);
     } else {
-        [self fillBlack];
+        // fill black
+        glClearColor(0, 0, 0, 0);
+        glClear(GL_COLOR_BUFFER_BIT);
     }
     [[self openGLContext] flushBuffer];
 }
 @end
 
 @interface VideoWindow : NSWindow
-@property (retain, readonly) VideoView* glView;
+@property (retain, readonly) VideoView* videoView;
 @end
 
 @implementation VideoWindow
 - (BOOL)canBecomeMainWindow { return YES; }
 - (BOOL)canBecomeKeyWindow { return YES; }
-- (void)initOGLView
+- (void)initVideoView
 {
     NSRect bounds = [[self contentView] bounds];
-    _glView = [[VideoView alloc] initWithFrame:bounds];
-    [self.contentView addSubview:_glView];
+    _videoView = [[VideoView alloc] initWithFrame:bounds];
+    [self.contentView addSubview:_videoView];
 }
 @end
 
@@ -112,8 +107,8 @@ static void wakeup(void*);
 
     // force a minimum size to stop opengl from exploding.
     [window setMinSize:NSMakeSize(200, 200)];
-    [window initOGLView];
-    [window setTitle:@"cocoa-openglcb example"];
+    [window initVideoView];
+    [window setTitle:@"nrx"];
     [window makeMainWindow];
     [window makeKeyAndOrderFront:nil];
 
@@ -155,26 +150,27 @@ static void wakeup(void*);
         exit(1);
     }
 
-    check_error(mpv_set_option_string(mpv, "input-media-keys", "yes"));
-    // request important errors
+    check_error(mpv_set_option_string(mpv, "terminal", "yes"));
     check_error(mpv_request_log_messages(mpv, "warn"));
 
     check_error(mpv_initialize(mpv));
     check_error(mpv_set_option_string(mpv, "vo", "opengl-cb"));
-    mpv_opengl_cb_context* mpvGL = mpv_get_sub_api(mpv, MPV_SUB_API_OPENGL_CB);
-    if (!mpvGL) {
+
+    mpv_opengl_cb_context* glctx = mpv_get_sub_api(mpv, MPV_SUB_API_OPENGL_CB);
+    if (!glctx) {
         puts("libmpv does not have the opengl-cb sub-API.");
         exit(1);
     }
-    // pass the mpvGL context to our view
-    window.glView.mpvGL = mpvGL;
-    int r = mpv_opengl_cb_init_gl(mpvGL, NULL, get_proc_address, NULL);
+
+    // pass the glctx context to our view
+    window.videoView.glctx = glctx;
+    int r = mpv_opengl_cb_init_gl(glctx, NULL, get_proc_address, NULL);
     if (r < 0) {
         puts("gl init has failed.");
         exit(1);
     }
     mpv_opengl_cb_set_update_callback(
-        mpvGL, glupdate, (__bridge void*)window.glView);
+        glctx, glupdate, (__bridge void*)window.videoView);
 
     // Deal with MPV in the background.
     queue = dispatch_queue_create("mpv", DISPATCH_QUEUE_SERIAL);
@@ -189,21 +185,13 @@ static void wakeup(void*);
 
 static void glupdate(void* ctx)
 {
-    VideoView* glView = (__bridge VideoView*)ctx;
-    [glView setNeedsDisplay:YES];
+    VideoView* videoView = (__bridge VideoView*)ctx;
+    [videoView setNeedsDisplay:YES];
 }
 
 - (void)handleEvent:(mpv_event*)event
 {
     switch (event->event_id) {
-    case MPV_EVENT_SHUTDOWN: {
-        mpv_detach_destroy(mpv);
-        mpv_opengl_cb_uninit_gl(window.glView.mpvGL);
-        mpv = NULL;
-        printf("event: shutdown\n");
-        break;
-    }
-
     case MPV_EVENT_LOG_MESSAGE: {
         struct mpv_event_log_message* msg
             = (struct mpv_event_log_message*)event->data;
@@ -242,9 +230,11 @@ static void wakeup(void* context)
 - (NSApplicationTerminateReply)applicationShouldTerminate:(NSApplication*)sender
 {
     NSLog(@"Terminating.");
-    const char* args[] = { "quit", NULL };
-    mpv_command(mpv, args);
-    [window.glView clearGLContext];
+    mpv_opengl_cb_context* tmp = window.videoView.glctx;
+    window.videoView.glctx = NULL;
+    mpv_opengl_cb_set_update_callback(tmp, NULL, NULL);
+    mpv_opengl_cb_uninit_gl(tmp);
+    mpv_detach_destroy(mpv);
     return NSTerminateNow;
 }
 
