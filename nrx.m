@@ -17,37 +17,38 @@ static inline void check_error(int status)
 
 static void* get_proc_address(void* ctx, const char* name)
 {
-    CFStringRef symbolName = CFStringCreateWithCString(kCFAllocatorDefault, name, kCFStringEncodingASCII);
-    void* addr = CFBundleGetFunctionPointerForName(CFBundleGetBundleWithIdentifier(CFSTR("com.apple.opengl")), symbolName);
+    CFStringRef symbolName = CFStringCreateWithCString(
+        kCFAllocatorDefault, name, kCFStringEncodingASCII);
+    void* addr = CFBundleGetFunctionPointerForName(
+        CFBundleGetBundleWithIdentifier(CFSTR("com.apple.opengl")), symbolName);
     CFRelease(symbolName);
     return addr;
 }
 
 static void glupdate(void* ctx);
 
-@interface MpvClientOGLView : NSOpenGLView
+@interface VideoView : NSOpenGLView
 @property mpv_opengl_cb_context* mpvGL;
 - (instancetype)initWithFrame:(NSRect)frame;
 - (void)fillBlack;
 @end
 
-@implementation MpvClientOGLView
+@implementation VideoView
 - (instancetype)initWithFrame:(NSRect)frame
 {
     // make sure the pixel format is double buffered so we can use
     // [[self openGLContext] flushBuffer].
-    NSOpenGLPixelFormatAttribute attributes[] = {
-        NSOpenGLPFADoubleBuffer,
-        0
-    };
+    NSOpenGLPixelFormatAttribute attributes[] = { NSOpenGLPFADoubleBuffer, 0 };
     self = [super initWithFrame:frame
-                    pixelFormat:[[NSOpenGLPixelFormat alloc] initWithAttributes:attributes]];
+                    pixelFormat:[[NSOpenGLPixelFormat alloc]
+                                    initWithAttributes:attributes]];
 
     if (self) {
         [self setAutoresizingMask:NSViewWidthSizable | NSViewHeightSizable];
         // swap on vsyncs
         GLint swapInt = 1;
-        [[self openGLContext] setValues:&swapInt forParameter:NSOpenGLCPSwapInterval];
+        [[self openGLContext] setValues:&swapInt
+                           forParameter:NSOpenGLCPSwapInterval];
         [[self openGLContext] makeCurrentContext];
         self.mpvGL = nil;
     }
@@ -62,25 +63,27 @@ static void glupdate(void* ctx);
 
 - (void)drawRect:(NSRect)dirtyRect
 {
-    if (self.mpvGL)
-        mpv_opengl_cb_draw(self.mpvGL, 0, self.bounds.size.width, -self.bounds.size.height);
-    else
+    if (self.mpvGL) {
+        mpv_opengl_cb_draw(
+            self.mpvGL, 0, self.bounds.size.width, -self.bounds.size.height);
+    } else {
         [self fillBlack];
+    }
     [[self openGLContext] flushBuffer];
 }
 @end
 
-@interface CocoaWindow : NSWindow
-@property (retain, readonly) MpvClientOGLView* glView;
+@interface VideoWindow : NSWindow
+@property (retain, readonly) VideoView* glView;
 @end
 
-@implementation CocoaWindow
+@implementation VideoWindow
 - (BOOL)canBecomeMainWindow { return YES; }
 - (BOOL)canBecomeKeyWindow { return YES; }
 - (void)initOGLView
 {
     NSRect bounds = [[self contentView] bounds];
-    _glView = [[MpvClientOGLView alloc] initWithFrame:bounds];
+    _glView = [[VideoView alloc] initWithFrame:bounds];
     [self.contentView addSubview:_glView];
 }
 @end
@@ -88,7 +91,7 @@ static void glupdate(void* ctx);
 @interface AppDelegate : NSObject <NSApplicationDelegate> {
     mpv_handle* mpv;
     dispatch_queue_t queue;
-    CocoaWindow* window;
+    VideoWindow* window;
 }
 @end
 
@@ -98,13 +101,14 @@ static void wakeup(void*);
 
 - (void)createWindow
 {
-    int mask = NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskResizable;
+    int mask = NSWindowStyleMaskTitled | NSWindowStyleMaskClosable
+        | NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskResizable;
 
-    window = [[CocoaWindow alloc]
-        initWithContentRect:NSMakeRect(0, 0, 1280, 720)
-                  styleMask:mask
-                    backing:NSBackingStoreBuffered
-                      defer:NO];
+    window =
+        [[VideoWindow alloc] initWithContentRect:NSMakeRect(0, 0, 1280, 720)
+                                       styleMask:mask
+                                         backing:NSBackingStoreBuffered
+                                           defer:NO];
 
     // force a minimum size to stop opengl from exploding.
     [window setMinSize:NSMakeSize(200, 200)];
@@ -114,10 +118,13 @@ static void wakeup(void*);
     [window makeKeyAndOrderFront:nil];
 
     NSMenu* m = [[NSMenu alloc] initWithTitle:@"AMainMenu"];
-    NSMenuItem* item = [m addItemWithTitle:@"Apple" action:nil keyEquivalent:@""];
+    NSMenuItem* item =
+        [m addItemWithTitle:@"Apple" action:nil keyEquivalent:@""];
     NSMenu* sm = [[NSMenu alloc] initWithTitle:@"Apple"];
     [m setSubmenu:sm forItem:item];
-    [sm addItemWithTitle:@"quit" action:@selector(terminate:) keyEquivalent:@"q"];
+    [sm addItemWithTitle:@"quit"
+                  action:@selector(terminate:)
+           keyEquivalent:@"q"];
     [NSApp setMenu:m];
     [NSApp activateIgnoringOtherApps:YES];
 }
@@ -166,7 +173,8 @@ static void wakeup(void*);
         puts("gl init has failed.");
         exit(1);
     }
-    mpv_opengl_cb_set_update_callback(mpvGL, glupdate, (__bridge void*)window.glView);
+    mpv_opengl_cb_set_update_callback(
+        mpvGL, glupdate, (__bridge void*)window.glView);
 
     // Deal with MPV in the background.
     queue = dispatch_queue_create("mpv", DISPATCH_QUEUE_SERIAL);
@@ -181,8 +189,8 @@ static void wakeup(void*);
 
 static void glupdate(void* ctx)
 {
-    MpvClientOGLView* glView = (__bridge MpvClientOGLView*)ctx;
-    [glView setNeedsDisplay: YES];
+    VideoView* glView = (__bridge VideoView*)ctx;
+    [glView setNeedsDisplay:YES];
 }
 
 - (void)handleEvent:(mpv_event*)event
@@ -197,7 +205,8 @@ static void glupdate(void* ctx)
     }
 
     case MPV_EVENT_LOG_MESSAGE: {
-        struct mpv_event_log_message* msg = (struct mpv_event_log_message*)event->data;
+        struct mpv_event_log_message* msg
+            = (struct mpv_event_log_message*)event->data;
         printf("[%s] %s: %s", msg->prefix, msg->level, msg->text);
     }
 
